@@ -90,6 +90,41 @@ button {
   border-radius: 6px;
 }
 
+/* 자동 분류 */
+.classify-bar {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+#auto-classify[aria-pressed="true"] {
+  background: #eef2ff;
+  border-color: #6366f1;
+}
+.classify-dialog {
+  width: min(480px, calc(100% - 32px));
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+.classify-dialog::backdrop { background: rgb(0 0 0 / 0.4); }
+.classify-dialog h2 { margin: 0 0 8px; font-size: 1.2em; }
+.classify-dialog .hint { margin: 0 0 12px; color: #6b7280; font-size: 0.9em; }
+.classify-dialog label { display: block; margin-top: 8px; font-weight: 600; }
+.classify-dialog textarea {
+  width: 100%;
+  font: inherit;
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+.dialog-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 16px;
+}
+#kw-reset { margin-right: auto; }
+
 /* 필터 탭 */
 .filters {
   display: flex;

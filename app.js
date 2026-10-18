@@ -1,9 +1,10 @@
 /*
  * 구조
- * - 상태: state 객체 하나가 유일한 데이터 원본 (todos, filter, lastCategory, editingId)
+ * - 상태: state 객체 하나가 유일한 데이터 원본
+ *   (todos, filter, lastCategory, autoClassify, keywords, editingId)
  * - 저장: load() / save()만 localStorage에 접근한다 (키 "todo-app:v1")
  * - 변경 함수: addTodo, toggleTodo, deleteTodo, updateTodo, startEdit, cancelEdit,
- *   setFilter, clearDone — 모두 상태 변경 -> save() -> render() 순서
+ *   setFilter, setAutoClassify, setKeywords, clearDone — 모두 상태 변경 -> save() -> render() 순서
  * - 렌더링: render()가 state를 읽어 진행률, 필터 탭, 목록을 통째로 다시 그린다
  * - 이벤트: #todo-list 하나에 위임, 폼 submit, 필터 탭, 완료 항목 비우기
  */
@@ -13,8 +14,38 @@ const MAX_TITLE = 100;
 const CATEGORY_LABELS = { work: "업무", personal: "개인", study: "공부" };
 const FILTER_LABELS = { all: "전체", ...CATEGORY_LABELS };
 
+// 자동 분류용 키워드. 제목에 포함된 키워드 수가 가장 많은 카테고리를 고른다.
+// ponytail: 단순 부분 문자열 비교라 "책상"도 "책"으로 잡힌다. 오분류가 잦으면 단어 경계 비교로 바꾼다.
+// 기본값이다. 사용자가 [분류 설정]에서 바꾼 키워드는 state.keywords에 저장된다.
+const DEFAULT_KEYWORDS = {
+  work: ["회의", "미팅", "보고", "보고서", "업무", "출근", "프로젝트", "기획", "메일", "이메일", "고객", "거래처", "발표", "결재", "마감", "팀장", "회사", "출장"],
+  personal: ["장보기", "마트", "병원", "운동", "헬스", "청소", "빨래", "약속", "친구", "가족", "생일", "여행", "은행", "택배", "산책", "요리", "쇼핑", "예약"],
+  study: ["공부", "복습", "예습", "강의", "인강", "과제", "시험", "독서", "책", "단어", "영어", "자격증", "문제", "수업", "학습", "코딩", "알고리즘", "논문"],
+};
+
+function classify(title) {
+  const text = title.toLowerCase();
+  let best = null;
+  let bestHits = 0;
+  for (const [category, words] of Object.entries(state.keywords)) {
+    const hits = words.filter((w) => text.includes(w)).length;
+    if (hits > bestHits) {
+      best = category;
+      bestHits = hits;
+    }
+  }
+  return best;
+}
+
 // editingId는 화면 상태라서 save()에서 저장하지 않는다.
-const state = { todos: [], filter: "all", lastCategory: "work", editingId: null };
+const state = {
+  todos: [],
+  filter: "all",
+  lastCategory: "work",
+  autoClassify: true,
+  keywords: structuredClone(DEFAULT_KEYWORDS),
+  editingId: null,
+};
 
 const form = document.getElementById("todo-form");
 const input = document.getElementById("todo-input");
@@ -25,6 +56,9 @@ const clearDoneBtn = document.getElementById("clear-done");
 const filters = document.getElementById("filters");
 const progressBar = document.getElementById("progress-bar");
 const progressText = document.getElementById("progress-text");
+const autoClassifyBtn = document.getElementById("auto-classify");
+const classifyDialog = document.getElementById("classify-dialog");
+const classifyForm = document.getElementById("classify-form");
 
 function load() {
   let raw;
@@ -50,6 +84,13 @@ function load() {
   state.todos = data.todos;
   if (data.filter in FILTER_LABELS) state.filter = data.filter;
   if (data.lastCategory in CATEGORY_LABELS) state.lastCategory = data.lastCategory;
+  if (typeof data.autoClassify === "boolean") state.autoClassify = data.autoClassify;
+  if (data.keywords && typeof data.keywords === "object") {
+    for (const category of Object.keys(CATEGORY_LABELS)) {
+      const words = data.keywords[category];
+      if (Array.isArray(words)) state.keywords[category] = words.filter((w) => typeof w === "string" && w);
+    }
+  }
 }
 
 function save() {
@@ -58,6 +99,8 @@ function save() {
       version: 1,
       filter: state.filter,
       lastCategory: state.lastCategory,
+      autoClassify: state.autoClassify,
+      keywords: state.keywords,
       todos: state.todos,
     }));
     saveError.hidden = true;
@@ -154,6 +197,8 @@ function renderFilters() {
     btn.classList.toggle("active", selected);
     btn.setAttribute("aria-pressed", String(selected));
   }
+  autoClassifyBtn.textContent = `자동 재분류 ${state.autoClassify ? "켜짐" : "꺼짐"}`;
+  autoClassifyBtn.setAttribute("aria-pressed", String(state.autoClassify));
 }
 
 // 목록을 다시 그리기 전에 포커스가 어느 항목의 어느 컨트롤에 있었는지 기억한다.
@@ -270,6 +315,23 @@ function setFilter(filter) {
   render();
 }
 
+function setAutoClassify(on) {
+  state.autoClassify = on;
+  save();
+  render();
+}
+
+function setKeywords(keywords) {
+  state.keywords = keywords;
+  save();
+  render();
+}
+
+// "회의, 미팅\n보고" -> ["회의", "미팅", "보고"] (공백 제거, 빈 값과 중복 제거)
+function parseKeywords(text) {
+  return [...new Set(text.split(/[,\n]/).map((w) => w.trim().toLowerCase()).filter(Boolean))];
+}
+
 function clearDone() {
   if (!state.todos.some((t) => t.done)) return;
   if (!confirm("완료한 할 일을 모두 삭제할까요?")) return;
@@ -320,9 +382,47 @@ list.addEventListener("keydown", (e) => {
   }
 });
 
+// 사용자가 카테고리를 직접 고르면 다음 추가 전까지 자동 분류를 멈춘다.
+let categoryPicked = false;
+
+input.addEventListener("input", () => {
+  if (state.autoClassify && !categoryPicked) categorySelect.value = classify(input.value) || state.lastCategory;
+});
+
+autoClassifyBtn.addEventListener("click", () => setAutoClassify(!state.autoClassify));
+
+function fillKeywordFields(keywords) {
+  for (const category of Object.keys(CATEGORY_LABELS)) {
+    classifyForm.elements[`kw-${category}`].value = keywords[category].join(", ");
+  }
+}
+
+document.getElementById("classify-settings").addEventListener("click", () => {
+  fillKeywordFields(state.keywords);
+  classifyDialog.showModal();
+});
+
+document.getElementById("kw-reset").addEventListener("click", () => fillKeywordFields(DEFAULT_KEYWORDS));
+
+// 저장 버튼(value="save")으로 제출할 때만 반영한다. 취소와 Esc는 아무것도 바꾸지 않는다.
+// close 이벤트는 다시 열었을 때 Chrome에서 오지 않는 경우가 있어 submit을 쓴다.
+classifyForm.addEventListener("submit", (e) => {
+  if (e.submitter?.value !== "save") return;
+  const keywords = {};
+  for (const category of Object.keys(CATEGORY_LABELS)) {
+    keywords[category] = parseKeywords(classifyForm.elements[`kw-${category}`].value);
+  }
+  setKeywords(keywords);
+});
+
+categorySelect.addEventListener("change", () => {
+  categoryPicked = true;
+});
+
 form.addEventListener("submit", (e) => {
   e.preventDefault();
   addTodo(input.value, categorySelect.value);
+  categoryPicked = false;
   input.value = "";
   input.focus();
 });

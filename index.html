@@ -34,6 +34,29 @@
       <button type="submit" id="add-btn">추가</button>
     </form>
 
+    <div class="classify-bar">
+      <button type="button" id="auto-classify" aria-pressed="true">자동 재분류 켜짐</button>
+      <button type="button" id="classify-settings">분류 설정</button>
+    </div>
+
+    <dialog id="classify-dialog" class="classify-dialog" aria-labelledby="classify-title">
+      <form id="classify-form" method="dialog">
+        <h2 id="classify-title">분류 설정</h2>
+        <p class="hint">제목에 아래 키워드가 들어 있으면 그 카테고리를 자동으로 고릅니다. 쉼표나 줄바꿈으로 구분하세요.</p>
+        <label for="kw-work">업무</label>
+        <textarea id="kw-work" name="kw-work" rows="3"></textarea>
+        <label for="kw-personal">개인</label>
+        <textarea id="kw-personal" name="kw-personal" rows="3"></textarea>
+        <label for="kw-study">공부</label>
+        <textarea id="kw-study" name="kw-study" rows="3"></textarea>
+        <div class="dialog-actions">
+          <button type="button" id="kw-reset">기본값으로</button>
+          <button type="submit" value="cancel">취소</button>
+          <button type="submit" value="save">저장</button>
+        </div>
+      </form>
+    </dialog>
+
     <nav id="filters" class="filters" aria-label="필터">
       <button type="button" class="filter-btn active" data-filter="all" aria-pressed="true">전체</button>
       <button type="button" class="filter-btn" data-filter="work" aria-pressed="false">업무</button>
