@@ -1,0 +1,82 @@
+/* ===== 데스크톱 버전 =====
+   기본 스타일은 ../style.css를 그대로 쓰고, 이 파일은 데스크톱용 차이만 담는다.
+   좁은 화면: 사이드바/본문 래퍼를 풀어 모바일과 같은 순서로 쌓는다.
+   넓은 화면(900px 이상): 왼쪽 사이드바(진행률·필터·비우기) + 오른쪽 본문(입력·목록). */
+:root { --hover: #f3f4f6; }
+:root[data-theme="dark"] { --hover: #374151; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) { --hover: #374151; }
+}
+
+.app { display: flex; flex-direction: column; }
+.sidebar, .content { display: contents; }
+.app-header { order: 0; }
+.progress { order: 1; }
+.todo-form { order: 2; }
+.classify-bar { order: 3; }
+.filters { order: 4; }
+.save-error { order: 5; }
+.todo-list { order: 6; }
+.app-footer { order: 7; }
+
+@media (min-width: 900px) {
+  body { min-height: 100vh; }
+  .app {
+    display: grid;
+    grid-template-columns: 300px 1fr;
+    grid-template-rows: auto 1fr;
+    gap: 24px 32px;
+    max-width: 1200px; /* 더 넓으면 제목과 버튼 사이가 너무 멀어진다 */
+    min-height: 100vh;
+    padding: 32px 40px;
+  }
+  .app-header {
+    grid-column: 1 / -1;
+    padding-bottom: 16px;
+    border-bottom: 1px solid var(--border);
+  }
+  .app-header h1 { font-size: 2.2em; }
+
+  .sidebar, .content { display: flex; flex-direction: column; }
+  .sidebar {
+    gap: 24px;
+    align-self: start;
+  }
+  .content { gap: 12px; min-width: 0; }
+
+  .progress, .filters { margin: 0; }
+  .progress {
+    padding: 16px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+  }
+  .cat-stats { flex-direction: column; }
+
+  /* 필터 탭을 세로 메뉴로 */
+  .filters { flex-direction: column; }
+  .filter-btn { flex: none; text-align: left; padding: 0 16px; }
+
+  .app-footer { margin: 0; flex-direction: column; }
+
+  .todo-form input { font-size: 1.05em; }
+  .classify-bar { margin-top: 0; }
+  .save-error { margin: 0; }
+
+  .todo-list { display: flex; flex-direction: column; gap: 8px; }
+  .todo-item { margin: 0; padding: 10px 12px; }
+}
+
+/* 사이드바(약 600px)가 화면 안에 다 들어갈 때만 고정한다.
+   더 낮은 창에서 고정하면 아래쪽 버튼이 화면 밖으로 잘린다. */
+@media (min-width: 900px) and (min-height: 660px) {
+  .sidebar { position: sticky; top: 32px; }
+}
+
+/* 마우스처럼 가리킬 수 있는 장치에서만 hover 표시 (터치 화면에서는 눌린 색이 남지 않게) */
+@media (hover: hover) {
+  button:not(:disabled):not(.active):hover { background: var(--hover); }
+  #auto-classify[aria-pressed="true"]:hover { background: var(--accent-bg); border-color: var(--text); }
+  .filter-btn.active:hover { opacity: 0.9; }
+  .todo-item:hover { border-color: var(--muted); }
+}

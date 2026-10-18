@@ -1,12 +1,14 @@
 /*
  * 구조
  * - 상태: state 객체 하나가 유일한 데이터 원본
- *   (todos, filter, lastCategory, autoClassify, keywords, editingId)
+ *   (todos, filter, lastCategory, autoClassify, keywords, theme, editingId)
  * - 저장: load() / save()만 localStorage에 접근한다 (키 "todo-app:v1")
  * - 변경 함수: addTodo, toggleTodo, deleteTodo, updateTodo, startEdit, cancelEdit,
- *   setFilter, setAutoClassify, setKeywords, clearDone — 모두 상태 변경 -> save() -> render() 순서
+ *   setFilter, setAutoClassify, setKeywords, setTheme, importData, clearDone — 모두 상태 변경 -> save() -> render() 순서
  * - 렌더링: render()가 state를 읽어 진행률, 필터 탭, 목록을 통째로 다시 그린다
- * - 이벤트: #todo-list 하나에 위임, 폼 submit, 필터 탭, 완료 항목 비우기
+ * - 내보내기: exportJson()은 상태를 바꾸지 않고 JSON 파일만 내려받게 한다
+ * - 불러오기: parseImport()로 파일을 검사한 뒤 importData()가 현재 목록을 통째로 바꾼다
+ * - 이벤트: #todo-list 하나에 위임, 폼 submit, 필터 탭, 완료 항목 비우기, 단축키 "/"
  */
 const STORAGE_KEY = "todo-app:v1";
 const BACKUP_KEY = "todo-app:v1:backup";
@@ -44,6 +46,7 @@ const state = {
   lastCategory: "work",
   autoClassify: true,
   keywords: structuredClone(DEFAULT_KEYWORDS),
+  theme: null, // null이면 운영체제 설정을 따른다
   editingId: null,
 };
 
@@ -59,6 +62,42 @@ const progressText = document.getElementById("progress-text");
 const autoClassifyBtn = document.getElementById("auto-classify");
 const classifyDialog = document.getElementById("classify-dialog");
 const classifyForm = document.getElementById("classify-form");
+const themeBtn = document.getElementById("theme-toggle");
+const darkQuery = matchMedia("(prefers-color-scheme: dark)");
+
+// 저장소나 불러온 파일에서 읽은 할 일 목록을 검사한다.
+// 형식이 틀린 항목과 id가 겹치는 항목은 버린다.
+function cleanTodos(items) {
+  const seen = new Set();
+  const todos = [];
+  for (const t of items) {
+    if (!t || typeof t.id !== "string" || typeof t.title !== "string" || seen.has(t.id)) continue;
+    const title = t.title.trim().slice(0, MAX_TITLE);
+    if (!title || !Object.hasOwn(CATEGORY_LABELS, t.category)) continue;
+    const done = t.done === true;
+    seen.add(t.id);
+    todos.push({
+      id: t.id,
+      title,
+      category: t.category,
+      done,
+      createdAt: Number.isFinite(t.createdAt) ? t.createdAt : Date.now(),
+      completedAt: done && Number.isFinite(t.completedAt) ? t.completedAt : null,
+    });
+  }
+  return todos;
+}
+
+// 카테고리별 키워드 배열을 검사한다. 없거나 틀린 카테고리는 base 값을 그대로 쓴다.
+function cleanKeywords(raw, base) {
+  const keywords = structuredClone(base);
+  if (!raw || typeof raw !== "object") return keywords;
+  for (const category of Object.keys(CATEGORY_LABELS)) {
+    const words = raw[category];
+    if (Array.isArray(words)) keywords[category] = words.filter((w) => typeof w === "string" && w);
+  }
+  return keywords;
+}
 
 function load() {
   let raw;
@@ -81,16 +120,12 @@ function load() {
   }
 
   if (!data || !Array.isArray(data.todos)) return;
-  state.todos = data.todos;
+  state.todos = cleanTodos(data.todos);
   if (data.filter in FILTER_LABELS) state.filter = data.filter;
   if (data.lastCategory in CATEGORY_LABELS) state.lastCategory = data.lastCategory;
   if (typeof data.autoClassify === "boolean") state.autoClassify = data.autoClassify;
-  if (data.keywords && typeof data.keywords === "object") {
-    for (const category of Object.keys(CATEGORY_LABELS)) {
-      const words = data.keywords[category];
-      if (Array.isArray(words)) state.keywords[category] = words.filter((w) => typeof w === "string" && w);
-    }
-  }
+  if (data.theme === "light" || data.theme === "dark") state.theme = data.theme;
+  state.keywords = cleanKeywords(data.keywords, state.keywords);
 }
 
 function save() {
@@ -101,6 +136,7 @@ function save() {
       lastCategory: state.lastCategory,
       autoClassify: state.autoClassify,
       keywords: state.keywords,
+      theme: state.theme,
       todos: state.todos,
     }));
     saveError.hidden = true;
@@ -226,8 +262,20 @@ function restoreFocus(saved) {
   }
 }
 
+function currentTheme() {
+  return state.theme || (darkQuery.matches ? "dark" : "light");
+}
+
+function renderTheme() {
+  const dark = currentTheme() === "dark";
+  document.documentElement.dataset.theme = dark ? "dark" : "light";
+  themeBtn.textContent = dark ? "라이트 모드" : "다크 모드";
+  themeBtn.setAttribute("aria-pressed", String(dark));
+}
+
 function render() {
   const focus = rememberFocus();
+  renderTheme();
   renderProgress();
   renderFilters();
 
@@ -323,6 +371,53 @@ function setAutoClassify(on) {
 
 function setKeywords(keywords) {
   state.keywords = keywords;
+  save();
+  render();
+}
+
+function setTheme(theme) {
+  state.theme = theme;
+  save();
+  render();
+}
+
+// 할 일과 분류 키워드를 JSON 파일로 내려받는다. 파일 이름은 todos-YYYY-MM-DD.json
+function exportJson() {
+  const data = {
+    version: 1,
+    exportedAt: new Date().toISOString(),
+    todos: state.todos,
+    keywords: state.keywords,
+  };
+  const url = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: "application/json" }));
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `todos-${new Date().toLocaleDateString("sv")}.json`;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+// 내보내기 파일(JSON 문자열)을 검사한다. 쓸 수 없는 파일이면 Error를 던진다.
+function parseImport(text) {
+  let data;
+  try {
+    data = JSON.parse(text);
+  } catch {
+    throw new Error("JSON 형식이 아닙니다.");
+  }
+  if (!data || !Array.isArray(data.todos)) throw new Error("할 일 목록(todos)이 없습니다.");
+  const todos = cleanTodos(data.todos);
+  return {
+    todos,
+    keywords: cleanKeywords(data.keywords, state.keywords),
+    skipped: data.todos.length - todos.length,
+  };
+}
+
+function importData({ todos, keywords }) {
+  state.todos = todos;
+  state.keywords = keywords;
+  state.editingId = null;
   save();
   render();
 }
@@ -428,6 +523,34 @@ form.addEventListener("submit", (e) => {
 });
 
 clearDoneBtn.addEventListener("click", clearDone);
+document.getElementById("export-json").addEventListener("click", exportJson);
+
+const importFile = document.getElementById("import-file");
+document.getElementById("import-json").addEventListener("click", () => importFile.click());
+importFile.addEventListener("change", async () => {
+  const file = importFile.files[0];
+  importFile.value = ""; // 같은 파일을 다시 고를 수 있게
+  if (!file) return;
+  let result;
+  try {
+    result = parseImport(await file.text());
+  } catch (err) {
+    alert(`불러올 수 없는 파일입니다. ${err.message}`);
+    return;
+  }
+  const note = result.skipped ? `\n(형식이 맞지 않는 ${result.skipped}개는 제외됩니다)` : "";
+  if (confirm(`현재 할 일 ${state.todos.length}개를 불러온 할 일 ${result.todos.length}개로 바꿀까요?${note}`)) importData(result);
+});
+themeBtn.addEventListener("click", () => setTheme(currentTheme() === "dark" ? "light" : "dark"));
+darkQuery.addEventListener("change", render); // 운영체제 설정이 바뀌면 따라간다(직접 고르지 않은 경우)
+
+// 단축키: 글을 쓰는 중이 아닐 때 "/"를 누르면 할 일 입력창으로 간다.
+document.addEventListener("keydown", (e) => {
+  if (e.key !== "/" || e.ctrlKey || e.metaKey || e.altKey || e.isComposing) return;
+  if (e.target.closest("input, textarea, select") || classifyDialog.open) return;
+  e.preventDefault();
+  input.focus();
+});
 
 filters.addEventListener("click", (e) => {
   const btn = e.target.closest(".filter-btn");

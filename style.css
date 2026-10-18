@@ -6,7 +6,44 @@
   --muted: #9ca3af;
   --border: #e5e7eb;
   --bg: #f9fafb;
+  --surface: #fff;
+  --hint: #6b7280;
+  --accent-bg: #eef2ff;
+  --accent: #6366f1;
+  --error-bg: #fee2e2;
+  --error: #b91c1c;
   --touch: 40px;
+  color-scheme: light;
+}
+
+/* 다크 모드: 직접 고른 값(data-theme)이 우선이고, 없으면 운영체제 설정을 따른다 */
+:root[data-theme="dark"] {
+  --text: #e5e7eb;
+  --muted: #9ca3af;
+  --border: #374151;
+  --bg: #111827;
+  --surface: #1f2937;
+  --hint: #9ca3af;
+  --accent-bg: #312e81;
+  --accent: #818cf8;
+  --error-bg: #450a0a;
+  --error: #fca5a5;
+  color-scheme: dark;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --text: #e5e7eb;
+    --muted: #9ca3af;
+    --border: #374151;
+    --bg: #111827;
+    --surface: #1f2937;
+    --hint: #9ca3af;
+    --accent-bg: #312e81;
+    --accent: #818cf8;
+    --error-bg: #450a0a;
+    --error: #fca5a5;
+    color-scheme: dark;
+  }
 }
 
 * { box-sizing: border-box; }
@@ -24,8 +61,10 @@ body {
   padding: 16px;
 }
 
-button, select, input[type="text"] {
+button, select, input[type="text"], textarea {
   font: inherit;
+  color: var(--text);
+  background: var(--surface);
   min-height: var(--touch);
 }
 
@@ -34,7 +73,7 @@ button {
   padding: 0 12px;
   border: 1px solid var(--border);
   border-radius: 6px;
-  background: #fff;
+  background: var(--surface);
   cursor: pointer;
 }
 
@@ -42,11 +81,12 @@ button {
 .app-header {
   display: flex;
   align-items: baseline;
-  justify-content: space-between;
+  flex-wrap: wrap;
   gap: 8px;
 }
 .app-header h1 { margin: 0; }
-.today { margin: 0; color: var(--muted); }
+.today { margin: 0 0 0 auto; color: var(--muted); }
+#theme-toggle { flex-shrink: 0; align-self: center; }
 
 /* 진행률 */
 .progress { margin: 16px 0; }
@@ -63,7 +103,7 @@ button {
 .cat-stat {
   padding: 4px 10px;
   border-left: 4px solid;
-  background: #fff;
+  background: var(--surface);
   border-radius: 4px;
 }
 
@@ -97,17 +137,19 @@ button {
   margin-top: 8px;
 }
 #auto-classify[aria-pressed="true"] {
-  background: #eef2ff;
-  border-color: #6366f1;
+  background: var(--accent-bg);
+  border-color: var(--accent);
 }
 .classify-dialog {
   width: min(480px, calc(100% - 32px));
   border: 1px solid var(--border);
   border-radius: 8px;
+  color: var(--text);
+  background: var(--surface);
 }
 .classify-dialog::backdrop { background: rgb(0 0 0 / 0.4); }
 .classify-dialog h2 { margin: 0 0 8px; font-size: 1.2em; }
-.classify-dialog .hint { margin: 0 0 12px; color: #6b7280; font-size: 0.9em; }
+.classify-dialog .hint { margin: 0 0 12px; color: var(--hint); font-size: 0.9em; }
 .classify-dialog label { display: block; margin-top: 8px; font-weight: 600; }
 .classify-dialog textarea {
   width: 100%;
@@ -134,7 +176,7 @@ button {
 .filter-btn { flex: 1; }
 .filter-btn.active {
   background: var(--text);
-  color: #fff;
+  color: var(--surface);
   border-color: var(--text);
 }
 
@@ -150,7 +192,7 @@ button {
   gap: 8px;
   padding: 8px;
   margin-bottom: 8px;
-  background: #fff;
+  background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 6px;
 }
@@ -205,8 +247,8 @@ button:disabled {
   margin: 0 0 8px;
   padding: 8px 12px;
   border-radius: 6px;
-  background: #fee2e2;
-  color: #b91c1c;
+  background: var(--error-bg);
+  color: var(--error);
 }
 
 /* 완료 항목 */
@@ -219,5 +261,8 @@ button:disabled {
 /* 하단 */
 .app-footer {
   margin-top: 16px;
-  text-align: right;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
 }

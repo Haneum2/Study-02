@@ -12,6 +12,7 @@
     <header class="app-header">
       <h1>할 일</h1>
       <p id="today" class="today"></p>
+      <button type="button" id="theme-toggle" aria-pressed="false">다크 모드</button>
     </header>
 
     <section id="progress" class="progress" aria-label="진행률">
@@ -25,7 +26,7 @@
     </section>
 
     <form id="todo-form" class="todo-form">
-      <input id="todo-input" type="text" maxlength="100" placeholder="할 일을 입력하세요" aria-label="할 일 제목" required>
+      <input id="todo-input" type="text" maxlength="100" placeholder="할 일을 입력하세요" aria-label="할 일 제목" aria-keyshortcuts="/" required>
       <select id="todo-category" aria-label="카테고리">
         <option value="work">업무</option>
         <option value="personal">개인</option>
@@ -69,6 +70,9 @@
     <ul id="todo-list" class="todo-list"></ul>
 
     <footer class="app-footer">
+      <button type="button" id="import-json">JSON 불러오기</button>
+      <input type="file" id="import-file" accept=".json,application/json" hidden>
+      <button type="button" id="export-json">JSON 내보내기</button>
       <button type="button" id="clear-done">완료 항목 비우기</button>
     </footer>
   </main>
